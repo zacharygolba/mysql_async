@@ -25,7 +25,7 @@ use std::ops::Index;
 use std::str;
 use std::sync::Arc;
 
-use value::{from_value, FromValue, Value};
+use value::{from_value, from_value_opt, FromValue, Value};
 use value::Value::*;
 
 lazy_static! {
@@ -798,6 +798,19 @@ impl Row {
         })
     }
 
+    /// Will copy value at index `index` if it was not taken by `Row::take` earlier,
+    /// then will convert it to `T`. Returns `None` if the value was taken taken by
+    /// `Row::take` or was not able to be converted to `T`.
+    pub fn get_opt<T, I>(&mut self, index: I) -> Option<T>
+        where T: FromValue,
+            I: ColumnIndex,
+    {
+        index.idx(&*self.columns)
+             .and_then(|idx| self.values.get(idx))
+             .and_then(|x| x.as_ref())
+             .and_then(|x| from_value_opt::<T>(x.clone()).ok())
+    }
+
     /// Will take value of a column with index `index` if it exists and wasn't taken earlier then
     /// will convert it to `T`.
     pub fn take<T, I>(&mut self, index: I) -> Option<T>
@@ -806,6 +819,19 @@ impl Row {
     {
         index.idx(&*self.columns)
             .and_then(|idx| self.values.get_mut(idx).and_then(|x| x.take()).map(from_value::<T>))
+    }
+
+    /// Will take value of a column with index `index` if it exists and wasn't taken earlier then
+    /// will converts it to `T`. Returns `None` if the value was taken earlier or was not able
+    /// to be converted to `T`.
+    pub fn take_opt<T, I>(&mut self, index: I) -> Option<T>
+        where T: FromValue,
+            I: ColumnIndex,
+    {
+        index.idx(&*self.columns)
+             .and_then(|idx| self.values.get_mut(idx))
+             .and_then(|x| x.take())
+             .and_then(|x| from_value_opt::<T>(x.clone()).ok())
     }
 
     /// Unwraps values of a row.
